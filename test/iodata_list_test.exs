@@ -39,7 +39,13 @@ defmodule IOIODataListTest do
 
   property "to_iodata/1" do
     check all(data <- iolist()) do
-      assert IOData.to_iodata(data) == data
+      assert IOData.to_iodata(data) == {:ok, data}
+    end
+  end
+
+  property "to_iodata!/1" do
+    check all(data <- iolist()) do
+      assert IOData.to_iodata!(data) == data
     end
   end
 
@@ -62,7 +68,13 @@ defmodule IOIODataListTest do
 
   property "to_binary/1" do
     check all(data <- iolist()) do
-      assert IOData.to_binary(data) == IO.iodata_to_binary(data)
+      assert IOData.to_binary(data) == {:ok, IO.iodata_to_binary(data)}
+    end
+  end
+
+  property "to_binary!/1" do
+    check all(data <- iolist()) do
+      assert IOData.to_binary!(data) == IO.iodata_to_binary(data)
     end
   end
 

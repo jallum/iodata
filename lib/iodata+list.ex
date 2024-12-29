@@ -108,7 +108,9 @@ defimpl IOData, for: List do
     end
   end
 
-  def to_iodata(data), do: data
+  def to_iodata(data), do: {:ok, data}
+
+  def to_iodata!(data), do: data
 
   def to_iodata(data, start, count) do
     [data]
@@ -133,7 +135,7 @@ defimpl IOData, for: List do
     end
   end
 
-  def to_binary(data), do: :erlang.list_to_binary(data)
+  def to_binary(data), do: {:ok, :erlang.list_to_binary(data)}
 
   def to_binary(data, start, count) do
     case to_iodata(data, start, count) do
@@ -141,6 +143,8 @@ defimpl IOData, for: List do
       {:error, reason} -> {:error, reason}
     end
   end
+
+  def to_binary!(data), do: :erlang.list_to_binary(data)
 
   def to_binary!(data, start, count) do
     case to_binary(data, start, count) do

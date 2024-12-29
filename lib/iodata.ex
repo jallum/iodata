@@ -35,8 +35,12 @@ defprotocol IOData do
   def starts_with?(data, binary)
 
   @doc "Returns the data in iodata form without modifying it."
-  @spec to_iodata(t()) :: iodata()
+  @spec to_iodata(t()) :: {:ok, iodata()} | {:error, reason :: term()}
   def to_iodata(data)
+
+  @doc "Same as to_iodata/0 but raises an error if the data is insufficient."
+  @spec to_iodata!(t()) :: iodata()
+  def to_iodata!(data)
 
   @doc "Extracts a portion of the data as iodata, starting at 'start' for 'count' bytes. Returns an ok/error tuple."
   @spec to_iodata(t(), start :: non_neg_integer(), count :: non_neg_integer()) ::
@@ -48,8 +52,12 @@ defprotocol IOData do
   def to_iodata!(data, start, count)
 
   @doc "Converts the entire data into a binary."
-  @spec to_binary(t()) :: binary()
+  @spec to_binary(t()) :: {:ok, binary()} | {:error, reason :: term()}
   def to_binary(data)
+
+  @doc "Same as to_binary/0 but raises an error if the data is insufficient."
+  @spec to_binary!(t()) :: binary()
+  def to_binary!(data)
 
   @doc "Extracts a portion of the data as a binary, starting at 'start' for 'count' bytes. Returns an ok/error tuple."
   @spec to_binary(t(), start :: non_neg_integer(), count :: non_neg_integer()) ::

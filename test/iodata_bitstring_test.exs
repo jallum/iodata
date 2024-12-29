@@ -35,7 +35,13 @@ defmodule Arrow.IODataBitstringTest do
 
   property "to_iodata/1" do
     check all(data <- binary()) do
-      assert IOData.to_iodata(data) == data
+      assert IOData.to_iodata(data) == {:ok, data}
+    end
+  end
+
+  property "to_iodata!/1" do
+    check all(data <- binary()) do
+      assert IOData.to_iodata!(data) == data
     end
   end
 
@@ -54,7 +60,13 @@ defmodule Arrow.IODataBitstringTest do
 
   property "to_binary/1" do
     check all(data <- binary()) do
-      assert IOData.to_binary(data) == data
+      assert IOData.to_binary(data) == {:ok, data}
+    end
+  end
+
+  property "to_binary!/1" do
+    check all(data <- binary()) do
+      assert IOData.to_binary!(data) == data
     end
   end
 

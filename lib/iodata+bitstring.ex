@@ -25,7 +25,9 @@ defimpl IOData, for: BitString do
   def starts_with?(data, value),
     do: :binary.longest_common_prefix([data, value]) == byte_size(value)
 
-  def to_iodata(data), do: data
+  def to_iodata(data), do: {:ok, data}
+
+  def to_iodata!(data), do: data
 
   def to_iodata(data, start, count) when byte_size(data) < count + start,
     do: {:error, :insufficient_data}
@@ -39,7 +41,9 @@ defimpl IOData, for: BitString do
     end
   end
 
-  def to_binary(data), do: data
+  def to_binary(data), do: {:ok, data}
+
+  def to_binary!(data), do: data
 
   def to_binary(data, start, count) when byte_size(data) < count + start,
     do: {:error, :insufficient_data}

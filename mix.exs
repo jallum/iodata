@@ -5,9 +5,15 @@ defmodule Iodata.MixProject do
     [
       app: :iodata,
       version: "0.5.0",
+      description:
+        "A protocol for efficiently working with binaries, iolists, files etc. with minimal copying and I/O.",
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      deps: deps(),
+      package: [
+        licenses: ["MIT"],
+        links: %{"GitHub" => "https://github.com/jallum/iodata"}
+      ]
     ]
   end
 
@@ -19,6 +25,7 @@ defmodule Iodata.MixProject do
 
   defp deps do
     [
+      {:ex_doc, "~> 0.34", only: :dev, runtime: false},
       {:stream_data, "~> 1.0", only: :test},
       {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false}
     ]

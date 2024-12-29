@@ -11,7 +11,7 @@ Implementations are provided for
 
 - binaries
 - iolists
-- file descriptors
+- files & file descriptors
 
 ## Usage
 

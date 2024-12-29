@@ -1,4 +1,4 @@
-defimpl IOData, for: File.Slice do
+defimpl IOData, for: IOData.File do
   def at_least?(slice, n_bytes), do: slice.count >= n_bytes
 
   def size(slice), do: slice.count
@@ -11,8 +11,8 @@ defimpl IOData, for: File.Slice do
   def split(slice, at) do
     {:ok,
      {
-       %File.Slice{file: slice.file, start: slice.start, count: at},
-       %File.Slice{file: slice.file, start: slice.start + at, count: slice.count - at}
+       %IOData.File{file: slice.file, start: slice.start, count: at},
+       %IOData.File{file: slice.file, start: slice.start + at, count: slice.count - at}
      }}
   end
 

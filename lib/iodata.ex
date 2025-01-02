@@ -38,14 +38,14 @@ defprotocol IOData do
   @spec to_iodata(t()) :: {:ok, iodata()} | {:error, reason :: term()}
   def to_iodata(data)
 
-  @doc "Same as to_iodata/0 but raises an error if the data is insufficient."
-  @spec to_iodata!(t()) :: iodata()
-  def to_iodata!(data)
-
   @doc "Extracts a portion of the data as iodata, starting at 'start' for 'count' bytes. Returns an ok/error tuple."
   @spec to_iodata(t(), start :: non_neg_integer(), count :: non_neg_integer()) ::
           {:ok, t()} | {:error, :insufficient_data}
   def to_iodata(data, start, count)
+
+  @doc "Same as to_iodata/0 but raises an error if the data is insufficient."
+  @spec to_iodata!(t()) :: iodata()
+  def to_iodata!(data)
 
   @doc "Same as to_iodata/3 but raises an error if the data is insufficient."
   @spec to_iodata!(t(), start :: non_neg_integer(), count :: non_neg_integer()) :: iodata()
@@ -55,14 +55,14 @@ defprotocol IOData do
   @spec to_binary(t()) :: {:ok, binary()} | {:error, reason :: term()}
   def to_binary(data)
 
-  @doc "Same as to_binary/0 but raises an error if the data is insufficient."
-  @spec to_binary!(t()) :: binary()
-  def to_binary!(data)
-
   @doc "Extracts a portion of the data as a binary, starting at 'start' for 'count' bytes. Returns an ok/error tuple."
   @spec to_binary(t(), start :: non_neg_integer(), count :: non_neg_integer()) ::
           {:ok, binary()} | {:error, :insufficient_data}
   def to_binary(data, start, count)
+
+  @doc "Same as to_binary/0 but raises an error if the data is insufficient."
+  @spec to_binary!(t()) :: binary()
+  def to_binary!(data)
 
   @doc "Same as to_binary/3 but raises an error if the data is insufficient."
   @spec to_binary!(t(), start :: non_neg_integer(), count :: non_neg_integer()) :: binary()

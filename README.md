@@ -12,6 +12,7 @@ Implementations are provided for
 - binaries
 - iolists
 - files & file descriptors
+- slices of other iodata
 
 ## Usage
 

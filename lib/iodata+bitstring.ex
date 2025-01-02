@@ -18,7 +18,7 @@ defimpl IOData, for: BitString do
   def split!(data, at) do
     case split(data, at) do
       {:ok, {a, b}} -> {a, b}
-      {:error, _} -> raise(ArgumentError, "insufficient data")
+      {:error, reason} -> raise ArgumentError, message: "#{reason}"
     end
   end
 
@@ -27,33 +27,35 @@ defimpl IOData, for: BitString do
 
   def to_iodata(data), do: {:ok, data}
 
-  def to_iodata!(data), do: data
-
   def to_iodata(data, start, count) when byte_size(data) < count + start,
     do: {:error, :insufficient_data}
 
-  def to_iodata(data, start, count), do: {:ok, binary_part(data, start, count)}
+  def to_iodata(data, start, count), do: to_binary(data, start, count)
+
+  def to_iodata!(data), do: data
 
   def to_iodata!(data, start, count) do
     case to_iodata(data, start, count) do
       {:ok, iodata} -> iodata
-      {:error, _} -> raise(ArgumentError, "insufficient data")
+      {:error, reason} -> raise ArgumentError, message: "#{reason}"
     end
   end
 
   def to_binary(data), do: {:ok, data}
 
-  def to_binary!(data), do: data
+  def to_binary(data, start, nil), do: {:ok, binary_part(data, start, byte_size(data) - start)}
 
   def to_binary(data, start, count) when byte_size(data) < count + start,
     do: {:error, :insufficient_data}
 
   def to_binary(data, start, count), do: {:ok, binary_part(data, start, count)}
 
+  def to_binary!(data), do: data
+
   def to_binary!(data, start, count) do
     case to_binary(data, start, count) do
       {:ok, binary} -> binary
-      {:error, _} -> raise(ArgumentError, "insufficient data")
+      {:error, reason} -> raise ArgumentError, message: "#{reason}"
     end
   end
 end

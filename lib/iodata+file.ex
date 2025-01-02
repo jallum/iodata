@@ -1,81 +1,71 @@
-defimpl IOData, for: IOData.File do
-  def at_least?(slice, n_bytes), do: slice.count >= n_bytes
+defimpl IOData, for: PID do
+  alias IOData.Slice
 
-  def size(slice), do: slice.count
+  def at_least?(file, n_bytes), do: size(file) >= n_bytes
 
-  def split(slice, at) when at > slice.count,
-    do: {:error, :insufficient_data}
-
-  def split(slice, 0), do: {:ok, {<<>>, slice}}
-
-  def split(slice, at) do
-    {:ok,
-     {
-       %IOData.File{file: slice.file, start: slice.start, count: at},
-       %IOData.File{file: slice.file, start: slice.start + at, count: slice.count - at}
-     }}
+  def size(file) do
+    case :file.read_file_info(file) do
+      {:ok, info} -> info |> elem(1)
+      {:error, _} -> false
+    end
   end
 
-  def split!(slice, at) do
-    case split(slice, at) do
-      {:ok, slices} -> slices
-      {:error, reason} -> raise ArgumentError, message: "#{reason}"
-    end
+  def split(file, 0), do: {:ok, {<<>>, file}}
+  def split(file, at), do: {:ok, split!(file, at)}
+
+  def split!(file, at) do
+    {
+      Slice.wrap(file, 0, at),
+      Slice.wrap(file, at, nil)
+    }
   end
 
   def starts_with?(_, <<>>), do: true
 
-  def starts_with?(slice, prefix) when byte_size(prefix) > slice.count,
-    do: false
-
-  def starts_with?(slice, prefix) do
-    case to_binary(slice, 0, byte_size(prefix)) do
+  def starts_with?(file, prefix) do
+    case to_binary(file, 0, byte_size(prefix)) do
       {:ok, data} -> data == prefix
       {:error, _} -> false
     end
   end
 
-  def to_iodata(slice), do: to_binary(slice)
-  def to_iodata!(slice), do: to_binary!(slice)
+  def to_iodata(file), do: to_binary(file)
+  def to_iodata!(file), do: to_binary!(file)
 
-  def to_iodata(slice, start, count), do: to_binary(slice, start, count)
-  def to_iodata!(slice, start, count), do: to_binary!(slice, start, count)
+  def to_iodata(file, start, count), do: to_binary(file, start, count)
+  def to_iodata!(file, start, count), do: to_binary!(file, start, count)
 
-  def to_binary(slice) when slice.count == 0, do: {:ok, <<>>}
+  def to_binary(file) when file.count == 0, do: {:ok, <<>>}
 
-  def to_binary(slice) do
-    case :file.pread(slice.file, slice.start, slice.count) do
+  def to_binary(file) do
+    case :file.pread(file, {:bof, 0}, size(file)) do
       {:ok, data} -> {:ok, data}
       :eof -> {:error, :eof}
       {:error, reason} -> {:error, reason}
     end
   end
 
-  def to_binary!(slice) do
-    case to_binary(slice) do
+  def to_binary!(file) do
+    case to_binary(file) do
       {:ok, data} -> data
-      {:error, reason} -> raise ArgumentError, message: "unexpected error: #{reason}"
+      {:error, reason} -> raise ArgumentError, message: "#{reason}"
     end
   end
 
-  def to_binary(slice, start, count) when start + count > slice.count,
-    do: {:error, :insufficient_data}
+  def to_binary(_, _, 0), do: {:ok, <<>>}
 
-  def to_binary(slice, start, count) do
-    case :file.pread(slice.file, slice.start + start, count) do
+  def to_binary(file, start, count) do
+    case :file.pread(file, {:bof, start}, count) do
       {:ok, data} -> {:ok, data}
       :eof -> {:error, :eof}
       {:error, reason} -> {:error, reason}
     end
   end
 
-  def to_binary!(slice, start, count) do
-    case to_binary(slice, start, count) do
-      {:ok, data} ->
-        data
-
-      {:error, reason} ->
-        raise ArgumentError, message: "unexpected error: #{reason}"
+  def to_binary!(file, start, count) do
+    case to_binary(file, start, count) do
+      {:ok, data} -> data
+      {:error, reason} -> raise ArgumentError, message: "#{reason}"
     end
   end
 end

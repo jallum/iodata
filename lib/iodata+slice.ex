@@ -41,7 +41,7 @@ defimpl IOData, for: IOData.Slice do
      }}
   end
 
-  def split!(%{count: nil} = slice, at) do
+  def split!(slice, at) do
     case split(slice, at) do
       {:ok, result} -> result
       {:error, reason} -> raise ArgumentError, message: "#{reason}"

@@ -104,4 +104,49 @@ defmodule IODataSliceTest do
       assert expected_data == binary_part(iodata, start, count)
     end
   end
+
+  property "slice/2 wraps the correct portion of the iodata" do
+    check all(
+            iodata <- binary(),
+            start <- integer(0..byte_size(iodata)),
+            count <- integer(0..(byte_size(iodata) - start))
+          ) do
+      slice = %Slice{iodata: iodata, start: 0, count: byte_size(iodata)}
+      {:ok, new_slice} = IOData.slice(slice, {start, count})
+      assert new_slice == %Slice{iodata: iodata, start: start, count: count}
+    end
+  end
+
+  property "slice/3 wraps the correct portion of the iodata" do
+    check all(
+            iodata <- binary(),
+            start <- integer(0..byte_size(iodata)),
+            count <- integer(0..(byte_size(iodata) - start))
+          ) do
+      slice = %Slice{iodata: iodata, start: 0, count: byte_size(iodata)}
+      {:ok, new_slice} = IOData.slice(slice, start, count)
+      assert new_slice == %Slice{iodata: iodata, start: start, count: count}
+    end
+  end
+
+  property "split!/2 splits the slice correctly" do
+    check all(
+            iodata <- binary(),
+            start <- integer(0..byte_size(iodata)),
+            count <- one_of([constant(nil), integer(0..byte_size(iodata))]),
+            at <- integer(0..(count || byte_size(iodata) - start))
+          ) do
+      slice = %Slice{iodata: iodata, start: start, count: count}
+
+      if at > (count || byte_size(iodata) - start) do
+        assert_raise ArgumentError, fn -> IOData.split!(slice, at) end
+      else
+        {head_slice, tail_slice} = IOData.split!(slice, at)
+        head_count = if count, do: min(at, count), else: at
+        tail_count = if count, do: count - head_count, else: nil
+        assert head_slice == %Slice{iodata: iodata, start: start, count: head_count}
+        assert tail_slice == %Slice{iodata: iodata, start: start + head_count, count: tail_count}
+      end
+    end
+  end
 end

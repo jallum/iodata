@@ -48,6 +48,10 @@ defprotocol IOData do
   @spec split(t(), non_neg_integer()) :: {:ok, {t(), t()}} | {:error, :insufficient_data}
   def split(data, at)
 
+  @doc "Same as split/2 but raises an error if the data is insufficient."
+  @spec split!(t(), non_neg_integer()) :: {t(), t()}
+  def split!(data, at)
+
   @doc "Checks if the given data starts with the specified binary prefix."
   @spec starts_with?(t(), binary()) :: boolean()
   def starts_with?(data, binary)

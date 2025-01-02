@@ -4,7 +4,7 @@ defmodule Iodata.MixProject do
   def project do
     [
       app: :iodata,
-      version: "0.7.0",
+      version: "0.7.1-dev",
       description:
         "A protocol for efficiently working with binaries, iolists, files etc. with minimal copying and I/O.",
       elixir: "~> 1.17",

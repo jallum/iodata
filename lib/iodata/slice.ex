@@ -50,7 +50,13 @@ defmodule IOData.Slice do
       iex> IOData.Slice.wrap("hello world", 0, 5)
       %IOData.Slice{iodata: "hello world", start: 0, count: 5}
   """
-  def wrap(iodata, start, count \\ nil) do
+  def wrap(iodata, start, count \\ nil)
+
+  def wrap(%__MODULE__{iodata: iodata}, start, count) do
+    %__MODULE__{iodata: iodata, start: start, count: count}
+  end
+
+  def wrap(iodata, start, count) do
     %__MODULE__{iodata: iodata, start: start, count: count}
   end
 end

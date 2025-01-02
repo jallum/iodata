@@ -28,6 +28,23 @@ defimpl IOData, for: List do
   def size([]), do: 0
   def size(data), do: :erlang.iolist_size(data)
 
+  def slice(data, {start, count}), do: to_iodata(data, start, count)
+  def slice(data, start, count), do: to_iodata(data, start, count)
+
+  def slice!(data, start_count) do
+    case slice(data, start_count) do
+      {:ok, slice} -> slice
+      {:error, reason} -> raise ArgumentError, message: "#{reason}"
+    end
+  end
+
+  def slice!(data, start, count) do
+    case slice(data, start, count) do
+      {:ok, slice} -> slice
+      {:error, reason} -> raise ArgumentError, message: "#{reason}"
+    end
+  end
+
   def split([], 0), do: {:ok, {[], []}}
   def split([], _), do: {:error, :insufficient_data}
 

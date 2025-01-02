@@ -11,6 +11,23 @@ defimpl IOData, for: BitString do
 
   def size(data), do: byte_size(data)
 
+  def slice(data, {start, count}), do: to_binary(data, start, count)
+  def slice(data, start, count), do: to_binary(data, start, count)
+
+  def slice!(data, start_count) do
+    case slice(data, start_count) do
+      {:ok, slice} -> slice
+      {:error, reason} -> raise ArgumentError, message: "#{reason}"
+    end
+  end
+
+  def slice!(data, start, count) do
+    case slice(data, start, count) do
+      {:ok, slice} -> slice
+      {:error, reason} -> raise ArgumentError, message: "#{reason}"
+    end
+  end
+
   def split(data, 0), do: {:ok, {<<>>, data}}
   def split(data, at) when at <= byte_size(data), do: {:ok, :erlang.split_binary(data, at)}
   def split(_, _), do: {:error, :insufficient_data}

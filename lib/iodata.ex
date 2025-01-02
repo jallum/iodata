@@ -26,6 +26,24 @@ defprotocol IOData do
   @spec size(t()) :: non_neg_integer()
   def size(data)
 
+  @doc "Returns a slice of the data, with a tuple that defines the start and count of bytes to extract."
+  @spec slice(t(), {start :: non_neg_integer(), count :: non_neg_integer()}) ::
+          {:ok, t()} | {:error, reason :: term()}
+  def slice(data, start_count)
+
+  @doc "Returns a slice of the data, starting at 'start' for 'count' bytes."
+  @spec slice(t(), start :: non_neg_integer(), count :: non_neg_integer()) ::
+          {:ok, t()} | {:error, reason :: term()}
+  def slice(data, start, count)
+
+  @doc "Same as slice/2 but raises an error if the data is insufficient."
+  @spec slice!(t(), {start :: non_neg_integer(), count :: non_neg_integer()}) :: t()
+  def slice!(data, start_count)
+
+  @doc "Same as slice/3 but raises an error if the data is insufficient."
+  @spec slice!(t(), start :: non_neg_integer(), count :: non_neg_integer()) :: t()
+  def slice!(data, start, count)
+
   @doc "Splits data at the specified byte offset if possible, returning either {:ok, {prefix, suffix}} or an error tuple."
   @spec split(t(), non_neg_integer()) :: {:ok, {t(), t()}} | {:error, :insufficient_data}
   def split(data, at)
@@ -43,7 +61,7 @@ defprotocol IOData do
           {:ok, t()} | {:error, :insufficient_data}
   def to_iodata(data, start, count)
 
-  @doc "Same as to_iodata/0 but raises an error if the data is insufficient."
+  @doc "Same as to_iodata/1 but raises an error if the data is insufficient."
   @spec to_iodata!(t()) :: iodata()
   def to_iodata!(data)
 
@@ -60,7 +78,7 @@ defprotocol IOData do
           {:ok, binary()} | {:error, :insufficient_data}
   def to_binary(data, start, count)
 
-  @doc "Same as to_binary/0 but raises an error if the data is insufficient."
+  @doc "Same as to_binary/1 but raises an error if the data is insufficient."
   @spec to_binary!(t()) :: binary()
   def to_binary!(data)
 

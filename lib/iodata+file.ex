@@ -10,6 +10,12 @@ defimpl IOData, for: PID do
     end
   end
 
+  def slice(file, {start, count}), do: {:ok, Slice.wrap(file, start, count)}
+  def slice(file, start, count), do: {:ok, Slice.wrap(file, start, count)}
+
+  def slice!(file, {start, count}), do: Slice.wrap(file, start, count)
+  def slice!(file, start, count), do: Slice.wrap(file, start, count)
+
   def split(file, 0), do: {:ok, {<<>>, file}}
   def split(file, at), do: {:ok, split!(file, at)}
 

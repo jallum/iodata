@@ -1,4 +1,11 @@
 defimpl IOData, for: IOData.Slice do
+  @moduledoc """
+  Implementation of the `IOData` protocol for `IOData.Slice`.
+
+  This module provides functions to work with slices of IO data, including
+  checking the size, splitting, and converting to binary or iodata.
+  """
+
   alias IOData.Slice
 
   def at_least?(%{count: nil} = slice, n_bytes),
@@ -7,14 +14,19 @@ defimpl IOData, for: IOData.Slice do
   def at_least?(slice, n_bytes), do: slice.count >= n_bytes
 
   def size(%{count: nil} = slice), do: IOData.size(slice.iodata) - slice.start
-
   def size(slice), do: slice.count
+
+  def slice(slice, {start, count}), do: {:ok, Slice.wrap(slice, start, count)}
+  def slice(slice, start, count), do: {:ok, Slice.wrap(slice, start, count)}
+
+  def slice!(slice, {start, count}), do: Slice.wrap(slice, start, count)
+  def slice!(slice, start, count), do: Slice.wrap(slice, start, count)
 
   def split(%{count: nil} = slice, at) do
     {:ok,
      {
-       Slice.wrap(slice.iodata, slice.start, at),
-       Slice.wrap(slice.iodata, slice.start + at)
+       Slice.wrap(slice, slice.start, at),
+       Slice.wrap(slice, slice.start + at)
      }}
   end
 
@@ -24,8 +36,8 @@ defimpl IOData, for: IOData.Slice do
   def split(slice, at) do
     {:ok,
      {
-       %Slice{iodata: slice.iodata, start: slice.start, count: at},
-       %Slice{iodata: slice.iodata, start: slice.start + at, count: slice.count - at}
+       Slice.wrap(slice, slice.start, at),
+       Slice.wrap(slice, slice.start + at, slice.count - at)
      }}
   end
 

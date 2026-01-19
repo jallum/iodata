@@ -41,8 +41,6 @@ defimpl IOData, for: PID do
   def to_iodata(file, start, count), do: to_binary(file, start, count)
   def to_iodata!(file, start, count), do: to_binary!(file, start, count)
 
-  def to_binary(file) when file.count == 0, do: {:ok, <<>>}
-
   def to_binary(file) do
     case :file.pread(file, {:bof, 0}, size(file)) do
       {:ok, data} -> {:ok, data}

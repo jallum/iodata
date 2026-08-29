@@ -10,9 +10,21 @@ defmodule Iodata.MixProject do
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
+      test_coverage: [tool: ExCoveralls],
       package: [
         licenses: ["MIT"],
         links: %{"GitHub" => "https://github.com/jallum/iodata"}
+      ]
+    ]
+  end
+
+  def cli do
+    [
+      preferred_envs: [
+        coveralls: :test,
+        "coveralls.github": :test,
+        "coveralls.json": :test,
+        "coveralls.html": :test
       ]
     ]
   end
@@ -27,6 +39,7 @@ defmodule Iodata.MixProject do
     [
       {:ex_doc, "~> 0.34", only: :dev, runtime: false},
       {:stream_data, "~> 1.0", only: :test},
+      {:excoveralls, "~> 0.18", only: :test},
       {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false}
     ]
   end

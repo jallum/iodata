@@ -1,4 +1,4 @@
-[![Build Status](https://github.com/jallum/iodata/workflows/CI/badge.svg)](https://github.com/jallum/iodata/actions) [![Hex.pm](https://img.shields.io/hexpm/v/iodata.svg)](https://hex.pm/packages/iodata) [![Documentation](https://img.shields.io/badge/documentation-gray)](https://hexdocs.pm/iodata/)
+[![Build Status](https://github.com/jallum/iodata/workflows/CI/badge.svg)](https://github.com/jallum/iodata/actions) [![Coverage Status](https://coveralls.io/repos/github/jallum/iodata/badge.svg?branch=main)](https://coveralls.io/github/jallum/iodata?branch=main) [![Hex.pm](https://img.shields.io/hexpm/v/iodata.svg)](https://hex.pm/packages/iodata) [![Documentation](https://img.shields.io/badge/documentation-gray)](https://hexdocs.pm/iodata/)
 
 ---
 

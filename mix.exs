@@ -4,7 +4,7 @@ defmodule Iodata.MixProject do
   def project do
     [
       app: :iodata,
-      version: "0.7.3",
+      version: "0.8.0",
       description:
         "A protocol for efficiently working with binaries, iolists, files etc. with minimal copying and I/O.",
       elixir: "~> 1.17",
@@ -13,7 +13,10 @@ defmodule Iodata.MixProject do
       test_coverage: [tool: ExCoveralls],
       package: [
         licenses: ["MIT"],
-        links: %{"GitHub" => "https://github.com/jallum/iodata"}
+        links: %{
+          "GitHub" => "https://github.com/jallum/iodata",
+          "Changelog" => "https://github.com/jallum/iodata/blob/main/CHANGELOG.md"
+        }
       ]
     ]
   end

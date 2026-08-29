@@ -149,4 +149,54 @@ defmodule IODataSliceTest do
       end
     end
   end
+
+  test "size/1 returns the count when the slice is bounded" do
+    assert IOData.size(Slice.wrap("hello world", 6, 5)) == 5
+  end
+
+  test "size/1 computes the remaining bytes when the slice is unbounded" do
+    assert IOData.size(Slice.wrap("hello world", 6)) == 5
+  end
+
+  test "slice!/2 rewraps the slice at the requested range" do
+    slice = Slice.wrap("hello world", 0, 11)
+    assert IOData.slice!(slice, {6, 5}) == %Slice{iodata: "hello world", start: 6, count: 5}
+  end
+
+  test "slice!/3 rewraps the slice at the requested range" do
+    slice = Slice.wrap("hello world", 0, 11)
+    assert IOData.slice!(slice, 0, 5) == %Slice{iodata: "hello world", start: 0, count: 5}
+  end
+
+  test "split/2 returns an error when splitting past a bounded slice" do
+    slice = Slice.wrap("hello world", 0, 5)
+    assert IOData.split(slice, 6) == {:error, :insufficient_data}
+  end
+
+  test "split!/2 raises when splitting past a bounded slice" do
+    slice = Slice.wrap("hello world", 0, 5)
+    assert_raise ArgumentError, fn -> IOData.split!(slice, 6) end
+  end
+
+  test "to_iodata/1 reads the sliced range from the underlying data" do
+    assert IOData.to_iodata(Slice.wrap("hello world", 6, 5)) == {:ok, "world"}
+  end
+
+  test "to_iodata!/1 reads the sliced range from the underlying data" do
+    assert IOData.to_iodata!(Slice.wrap("hello world", 6, 5)) == "world"
+  end
+
+  test "to_iodata!/3 reads relative to the slice's own start" do
+    slice = Slice.wrap("hello world", 6, 5)
+    assert IOData.to_iodata!(slice, 1, 3) == "orl"
+  end
+
+  test "to_binary!/1 reads the sliced range from the underlying data" do
+    assert IOData.to_binary!(Slice.wrap("hello world", 0, 5)) == "hello"
+  end
+
+  test "to_binary!/3 reads relative to the slice's own start" do
+    slice = Slice.wrap("hello world", 6, 5)
+    assert IOData.to_binary!(slice, 1, 3) == "orl"
+  end
 end

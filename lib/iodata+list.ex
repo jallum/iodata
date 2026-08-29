@@ -58,12 +58,12 @@ defimpl IOData, for: List do
   def split!(data, at) do
     case split(data, at) do
       {:ok, {prefix, suffix}} -> {prefix, suffix}
-      {:error, reason} -> raise ArgumentError, message: "#{reason}", term: data
+      {:error, reason} -> raise ArgumentError, message: "#{reason}"
     end
   end
 
   defp do_split(iolist, 0), do: {[], iolist}
-  defp do_split([], _), do: {[], []}
+  defp do_split([], _), do: :eol
 
   defp do_split(iolist, n) do
     case next(iolist) do
@@ -74,16 +74,20 @@ defimpl IOData, for: List do
         if n == 1 do
           {[byte], rest}
         else
-          {left, right} = do_split(rest, n - 1)
-          {[byte | left], right}
+          case do_split(rest, n - 1) do
+            :eol -> :eol
+            {left, right} -> {[byte | left], right}
+          end
         end
 
       {chunk, rest} ->
         chunk_size = byte_size(chunk)
 
         if chunk_size <= n do
-          {left, right} = do_split(rest, n - chunk_size)
-          {[chunk | left], right}
+          case do_split(rest, n - chunk_size) do
+            :eol -> :eol
+            {left, right} -> {[chunk | left], right}
+          end
         else
           left_chunk = binary_part(chunk, 0, n)
           right_chunk = binary_part(chunk, n, chunk_size - n)
@@ -136,8 +140,9 @@ defimpl IOData, for: List do
       {t, 0} ->
         gather(t, count)
         |> case do
-          {[bin], _} when is_binary(bin) -> {:ok, bin}
-          {iolist, _} -> {:ok, iolist}
+          {[bin], 0} when is_binary(bin) -> {:ok, bin}
+          {iolist, 0} -> {:ok, iolist}
+          {_, _} -> {:error, :insufficient_data}
         end
 
       _ ->
@@ -148,7 +153,7 @@ defimpl IOData, for: List do
   def to_iodata!(data, start, count) do
     case to_iodata(data, start, count) do
       {:ok, iolist} -> iolist
-      {:error, reason} -> raise ArgumentError, message: "#{reason}", term: data
+      {:error, reason} -> raise ArgumentError, message: "#{reason}"
     end
   end
 
@@ -166,7 +171,7 @@ defimpl IOData, for: List do
   def to_binary!(data, start, count) do
     case to_binary(data, start, count) do
       {:ok, iolist} -> iolist
-      {:error, reason} -> raise ArgumentError, message: "#{reason}", term: data
+      {:error, reason} -> raise ArgumentError, message: "#{reason}"
     end
   end
 

@@ -21,3 +21,6 @@ iodata-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+
+# Claude Code local configuration and skills.
+.claude/

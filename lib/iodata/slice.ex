@@ -49,11 +49,24 @@ defmodule IOData.Slice do
 
       iex> IOData.Slice.wrap("hello world", 0, 5)
       %IOData.Slice{iodata: "hello world", start: 0, count: 5}
+
+      iex> IOData.Slice.wrap(["hello", " ", "world"], 7, 3)
+      %IOData.Slice{iodata: ["orld"], start: 0, count: 3}
   """
   def wrap(iodata, start, count \\ nil)
 
-  def wrap(%__MODULE__{iodata: iodata}, start, count) do
-    %__MODULE__{iodata: iodata, start: start, count: count}
+  def wrap(%__MODULE__{iodata: iodata}, start, count), do: wrap(iodata, start, count)
+
+  # A slice over a list is advanced to `start` eagerly. Every later operation
+  # would otherwise have to walk the list from its head again, which makes
+  # consuming a list through successive slices quadratic. Skipping `start`
+  # bytes costs the same as `IOData.split/2` on the list, and the consumed
+  # prefix is dropped rather than copied.
+  def wrap(iodata, start, count) when is_list(iodata) and start > 0 do
+    case IOData.to_iodata(iodata, start, nil) do
+      {:ok, rest} -> %__MODULE__{iodata: rest, start: 0, count: count}
+      {:error, _} -> %__MODULE__{iodata: iodata, start: start, count: count}
+    end
   end
 
   def wrap(iodata, start, count) do

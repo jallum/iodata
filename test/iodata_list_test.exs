@@ -5,7 +5,7 @@ defmodule IOIODataListTest do
   property "at_least?/2" do
     check all(
             data <- iolist(),
-            bytes <- integer(0..IO.iodata_length(data))
+            bytes <- integer(0..(IO.iodata_length(data) + 2))
           ) do
       assert IOData.at_least?(data, bytes) == bytes <= IO.iodata_length(data)
     end
@@ -89,6 +89,70 @@ defmodule IOIODataListTest do
         {:error, :insufficient_data} -> assert IO.iodata_length(data) < count + start
       end
     end
+  end
+
+  test "at_least?/2 is false when a nested iolist runs out mid-walk" do
+    refute IOData.at_least?([["a"]], 2)
+    refute IOData.at_least?([[]], 1)
+    refute IOData.at_least?(["a", []], 2)
+    refute IOData.at_least?(["a", [[], [?b]], []], 3)
+    assert IOData.at_least?(["a", [[], [?b]], []], 2)
+  end
+
+  test "at_least?/2 handles improper tails" do
+    assert IOData.at_least?(["ab" | "cd"], 4)
+    refute IOData.at_least?(["ab" | "cd"], 5)
+    assert IOData.at_least?([?a | "cd"], 3)
+  end
+
+  test "operations on deeply nested iolists preserve content" do
+    chunks = for i <- 1..64, do: <<i::8>>
+    left = Enum.reduce(chunks, [], &[&2, &1])
+    right = chunks |> Enum.reverse() |> Enum.reduce([], &[&1, &2])
+    improper = Enum.reduce(chunks, [], &[&2 | &1])
+    flat = IO.iodata_to_binary(chunks)
+
+    for data <- [left, right, improper] do
+      assert IOData.size(data) == 64
+      assert IOData.at_least?(data, 64)
+      refute IOData.at_least?(data, 65)
+      assert IOData.starts_with?(data, binary_part(flat, 0, 10))
+      refute IOData.starts_with?(data, binary_part(flat, 1, 10))
+      assert IOData.to_binary!(data, 10, 20) == binary_part(flat, 10, 20)
+      assert IOData.to_iodata(data, 60, 5) == {:error, :insufficient_data}
+      {a, b} = IOData.split!(data, 33)
+      assert IO.iodata_to_binary(a) == binary_part(flat, 0, 33)
+      assert IO.iodata_to_binary(b) == binary_part(flat, 33, 31)
+      assert IOData.split(data, 65) == {:error, :insufficient_data}
+    end
+  end
+
+  test "split/2 at zero and at the end" do
+    assert {:ok, {[], ["ab", "cd"]}} = IOData.split(["ab", "cd"], 0)
+    assert {:ok, {prefix, suffix}} = IOData.split(["ab", ["cd"]], 4)
+    assert IO.iodata_to_binary(prefix) == "abcd"
+    assert IO.iodata_to_binary(suffix) == ""
+  end
+
+  test "split/2 keeps the suffix an iolist even when the remainder is an improper tail" do
+    assert {:ok, {prefix, suffix}} = IOData.split(["ab" | "cd"], 2)
+    assert IO.iodata_to_binary(prefix) == "ab"
+    assert is_list(suffix)
+    assert IO.iodata_to_binary(suffix) == "cd"
+  end
+
+  test "to_iodata/3 with a nil count returns everything from start" do
+    assert {:ok, rest} = IOData.to_iodata(["ab", ["cd", "ef"]], 3, nil)
+    assert IO.iodata_to_binary(rest) == "def"
+    assert {:ok, rest} = IOData.to_iodata(["ab"], 2, nil)
+    assert IO.iodata_to_binary(rest) == ""
+    assert IOData.to_iodata(["ab"], 3, nil) == {:error, :insufficient_data}
+    assert IOData.to_binary(["ab", "cd"], 1, nil) == {:ok, "bcd"}
+  end
+
+  test "to_iodata/3 returns a bare binary when the range lies within one chunk" do
+    assert IOData.to_iodata(["hello", "world"], 1, 3) == {:ok, "ell"}
+    assert IOData.to_iodata(["hello", "world"], 3, 4) == {:ok, ["lo", "wo"]}
   end
 
   test "at_least?/2 is false for an empty list and a positive byte count" do

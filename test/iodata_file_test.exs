@@ -103,8 +103,13 @@ defmodule IODataFileTest do
     file
   end
 
-  test "size/1 returns false when the file cannot be read" do
-    assert IOData.size(closed_file()) == false
+  test "size/1 raises when the file cannot be read" do
+    assert_raise ArgumentError, ~r/cannot read file size/, fn -> IOData.size(closed_file()) end
+  end
+
+  test "at_least?/2 is false when the file cannot be read" do
+    refute IOData.at_least?(closed_file(), 0)
+    refute IOData.at_least?(closed_file(), 1)
   end
 
   test "slice/2 wraps the file in a slice" do
@@ -167,6 +172,15 @@ defmodule IODataFileTest do
     assert IOData.to_iodata!(file, 6, 5) == "world"
   end
 
+  test "the suffix of split/2 (a slice with no count) reads to the end of the file" do
+    file = tmp_file("hello world")
+    {_, suffix} = IOData.split!(file, 6)
+    assert IOData.to_binary(suffix) == {:ok, "world"}
+    assert IOData.to_binary(IOData.Slice.wrap(file, 11)) == {:ok, <<>>}
+    assert IOData.to_binary(IOData.Slice.wrap(file, 20)) == {:ok, <<>>}
+    assert {:error, _} = IOData.to_binary(IOData.Slice.wrap(closed_file(), 1))
+  end
+
   test "to_binary/3 with a zero count returns an empty binary" do
     file = tmp_file("hello")
     assert IOData.to_binary(file, 0, 0) == {:ok, <<>>}
@@ -192,5 +206,69 @@ defmodule IODataFileTest do
 
   test "to_binary/3 returns an error when the file is closed" do
     assert {:error, :terminated} = IOData.to_binary(closed_file(), 0, 3)
+  end
+
+  describe "raw files" do
+    defp raw_file(data) do
+      file_name = Path.join(["file_file_test_raw_#{:rand.uniform(100_000)}"])
+      {:ok, file} = :file.open(file_name, [:write, :read, :binary, :raw])
+      :ok = File.rm(file_name)
+      :ok = :file.pwrite(file, 0, data)
+      # No on_exit close: a raw handle is owned by this process and goes away
+      # with it; on_exit callbacks run elsewhere.
+      file
+    end
+
+    test "are {:file_descriptor, _, _} tuples" do
+      assert {:file_descriptor, _, _} = raw_file("x")
+    end
+
+    test "size/1 and at_least?/2" do
+      file = raw_file("hello world")
+      assert IOData.size(file) == 11
+      assert IOData.at_least?(file, 11)
+      refute IOData.at_least?(file, 12)
+    end
+
+    test "split/2 and slice/3 are lazy" do
+      file = raw_file("hello world")
+      assert IOData.split(file, 0) == {:ok, {<<>>, file}}
+      assert {:ok, {a, b}} = IOData.split(file, 5)
+      assert IOData.to_binary(a) == {:ok, "hello"}
+      assert IOData.to_binary(b) == {:ok, " world"}
+      assert IOData.slice!(file, 6, 5) |> IOData.to_binary!() == "world"
+      assert IOData.slice!(file, {6, 5}) |> IOData.to_binary!() == "world"
+      assert {:ok, %IOData.Slice{}} = IOData.slice(file, 6, 5)
+      assert {:ok, %IOData.Slice{}} = IOData.slice(file, {6, 5})
+      assert {%IOData.Slice{}, %IOData.Slice{}} = IOData.split!(file, 3)
+    end
+
+    test "starts_with?/2" do
+      file = raw_file("hello world")
+      assert IOData.starts_with?(file, "hello")
+      refute IOData.starts_with?(file, "world")
+    end
+
+    test "to_binary and to_iodata read the file" do
+      file = raw_file("hello world")
+      assert IOData.to_binary(file) == {:ok, "hello world"}
+      assert IOData.to_binary!(file) == "hello world"
+      assert IOData.to_iodata(file) == {:ok, "hello world"}
+      assert IOData.to_iodata!(file) == "hello world"
+      assert IOData.to_binary(file, 6, 5) == {:ok, "world"}
+      assert IOData.to_binary!(file, 6, 5) == "world"
+      assert IOData.to_iodata(file, 6, 5) == {:ok, "world"}
+      assert IOData.to_iodata!(file, 6, 5) == "world"
+      assert IOData.to_binary(file, 100, 5) == {:error, :eof}
+    end
+
+    test "other tuples raise Protocol.UndefinedError" do
+      assert_raise Protocol.UndefinedError, ~r/only raw file handles/, fn ->
+        IOData.size({:ok, "nope"})
+      end
+
+      assert_raise Protocol.UndefinedError, fn -> IOData.split({1, 2}, 0) end
+      assert_raise Protocol.UndefinedError, fn -> IOData.to_binary({}) end
+    end
   end
 end

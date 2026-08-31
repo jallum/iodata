@@ -4,29 +4,36 @@ defimpl IOData, for: List do
 
   These functions treat lists as IOLists, providing utilities to check sizes,
   split data, and convert to binaries or iodata without unnecessary copying.
+
+  ## Traversal
+
+  Every walk below is tail-recursive over the current list with an explicit
+  stack (`ks`) of the tails still to be visited. Descending into a nested list
+  pushes the enclosing tail; reaching `[]` pops one. This costs one cons per
+  sublist rather than one tuple + cons per *element*, and it never re-wraps the
+  structure, so nesting depth is paid once, not once per element. Improper
+  tails (`[a | "bin"]`) are handled by treating a bare binary as a one-element
+  list.
   """
 
+  # -- at_least? ---------------------------------------------------------------
+
   def at_least?(_data, 0), do: true
-  def at_least?([], _bytes), do: false
+  def at_least?(data, n), do: at_least(data, [], n)
 
-  def at_least?(data, bytes) do
-    case next(data) do
-      {byte, rest} when is_integer(byte) ->
-        at_least?(rest, bytes - 1)
+  defp at_least(_, _, n) when n <= 0, do: true
+  defp at_least([], [], _n), do: false
+  defp at_least([], [k | ks], n), do: at_least(k, ks, n)
+  defp at_least([h | t], ks, n) when is_binary(h), do: at_least(t, ks, n - byte_size(h))
+  defp at_least([h | t], ks, n) when is_integer(h), do: at_least(t, ks, n - 1)
+  defp at_least([h | t], ks, n) when is_list(h), do: at_least(h, [t | ks], n)
+  defp at_least(b, ks, n) when is_binary(b), do: at_least([], ks, n - byte_size(b))
 
-      {binary, rest} when is_binary(binary) ->
-        binary_size = byte_size(binary)
+  # -- size --------------------------------------------------------------------
 
-        if bytes <= binary_size do
-          true
-        else
-          at_least?(rest, bytes - binary_size)
-        end
-    end
-  end
-
-  def size([]), do: 0
   def size(data), do: :erlang.iolist_size(data)
+
+  # -- slice -------------------------------------------------------------------
 
   def slice(data, {start, count}), do: to_iodata(data, start, count)
   def slice(data, start, count), do: to_iodata(data, start, count)
@@ -45,15 +52,9 @@ defimpl IOData, for: List do
     end
   end
 
-  def split([], 0), do: {:ok, {[], []}}
-  def split([], _), do: {:error, :insufficient_data}
+  # -- split -------------------------------------------------------------------
 
-  def split(data, at) do
-    case do_split(data, at) do
-      :eol -> {:error, :insufficient_data}
-      {prefix, suffix} -> {:ok, {prefix, suffix}}
-    end
-  end
+  def split(data, at), do: split(data, [], at, [])
 
   def split!(data, at) do
     case split(data, at) do
@@ -62,91 +63,78 @@ defimpl IOData, for: List do
     end
   end
 
-  defp do_split(iolist, 0), do: {[], iolist}
-  defp do_split([], _), do: :eol
+  defp split(rest, ks, 0, acc), do: {:ok, {:lists.reverse(acc), resume(rest, ks)}}
+  defp split([], [], _n, _acc), do: {:error, :insufficient_data}
+  defp split([], [k | ks], n, acc), do: split(k, ks, n, acc)
 
-  defp do_split(iolist, n) do
-    case next(iolist) do
-      :eol ->
-        :eol
+  defp split([h | t], ks, n, acc) when is_binary(h) do
+    size = byte_size(h)
 
-      {byte, rest} when is_integer(byte) ->
-        if n == 1 do
-          {[byte], rest}
-        else
-          case do_split(rest, n - 1) do
-            :eol -> :eol
-            {left, right} -> {[byte | left], right}
-          end
-        end
-
-      {chunk, rest} ->
-        chunk_size = byte_size(chunk)
-
-        if chunk_size <= n do
-          case do_split(rest, n - chunk_size) do
-            :eol -> :eol
-            {left, right} -> {[chunk | left], right}
-          end
-        else
-          left_chunk = binary_part(chunk, 0, n)
-          right_chunk = binary_part(chunk, n, chunk_size - n)
-          {[left_chunk], [right_chunk | rest]}
-        end
+    if size <= n do
+      split(t, ks, n - size, [h | acc])
+    else
+      prefix = :lists.reverse([binary_part(h, 0, n) | acc])
+      suffix = resume([binary_part(h, n, size - n) | t], ks)
+      {:ok, {prefix, suffix}}
     end
   end
 
-  def starts_with?(_, <<>>), do: true
+  defp split([h | t], ks, n, acc) when is_integer(h), do: split(t, ks, n - 1, [h | acc])
+  defp split([h | t], ks, n, acc) when is_list(h), do: split(h, [t | ks], n, acc)
+  defp split(b, ks, n, acc) when is_binary(b), do: split([b], ks, n, acc)
 
-  def starts_with?(data, value) do
-    case next(data) do
-      :eol ->
-        false
+  # Rebuild the unvisited remainder as an iolist: what's left of the current
+  # list, followed by every pending tail.
+  defp resume([], [k | ks]), do: resume(k, ks)
+  defp resume(rest, []) when is_list(rest), do: rest
+  defp resume(rest, ks), do: [rest | ks]
 
-      {byte, rest} when is_integer(byte) ->
-        case value do
-          <<^byte::8, rest_of_value::binary>> ->
-            starts_with?(rest, rest_of_value)
+  # -- starts_with? ------------------------------------------------------------
 
-          _ ->
-            false
-        end
+  def starts_with?(data, prefix), do: starts_with(data, [], prefix)
 
-      {binary, rest} when is_binary(binary) ->
-        binary_size = byte_size(binary)
-        value_size = byte_size(value)
+  defp starts_with(_, _, <<>>), do: true
+  defp starts_with([], [], _prefix), do: false
+  defp starts_with([], [k | ks], prefix), do: starts_with(k, ks, prefix)
 
-        case :binary.longest_common_prefix([binary, value]) do
-          ^binary_size ->
-            starts_with?(rest, binary_part(value, binary_size, value_size - binary_size))
+  defp starts_with([h | t], ks, prefix) when is_binary(h) do
+    size = byte_size(h)
+    prefix_size = byte_size(prefix)
 
-          ^value_size ->
-            true
-
-          _ ->
-            false
-        end
+    if size >= prefix_size do
+      binary_part(h, 0, prefix_size) == prefix
+    else
+      case prefix do
+        <<^h::binary-size(size), rest::binary>> -> starts_with(t, ks, rest)
+        _ -> false
+      end
     end
   end
+
+  defp starts_with([h | t], ks, <<h::8, rest::binary>>) when is_integer(h),
+    do: starts_with(t, ks, rest)
+
+  defp starts_with([h | _], _ks, _prefix) when is_integer(h), do: false
+  defp starts_with([h | t], ks, prefix) when is_list(h), do: starts_with(h, [t | ks], prefix)
+  defp starts_with(b, ks, prefix) when is_binary(b), do: starts_with([b], ks, prefix)
+
+  # -- to_iodata ---------------------------------------------------------------
 
   def to_iodata(data), do: {:ok, data}
 
   def to_iodata!(data), do: data
 
-  def to_iodata(data, start, count) do
-    [data]
-    |> seek(start)
-    |> case do
-      {t, 0} ->
-        gather(t, count)
-        |> case do
-          {[bin], 0} when is_binary(bin) -> {:ok, bin}
-          {iolist, 0} -> {:ok, iolist}
-          {_, _} -> {:error, :insufficient_data}
-        end
+  def to_iodata(data, start, nil) do
+    case seek(data, [], start) do
+      {rest, ks} -> {:ok, resume(rest, ks)}
+      :eol -> {:error, :insufficient_data}
+    end
+  end
 
-      _ ->
-        {:error, :insufficient_data}
+  def to_iodata(data, start, count) do
+    case seek(data, [], start) do
+      {rest, ks} -> gather(rest, ks, count, [])
+      :eol -> {:error, :insufficient_data}
     end
   end
 
@@ -156,6 +144,50 @@ defimpl IOData, for: List do
       {:error, reason} -> raise ArgumentError, message: "#{reason}"
     end
   end
+
+  # Advance `n` bytes; returns the remainder as {current_list, pending_tails}.
+  defp seek(rest, ks, 0), do: {rest, ks}
+  defp seek([], [], _n), do: :eol
+  defp seek([], [k | ks], n), do: seek(k, ks, n)
+
+  defp seek([h | t], ks, n) when is_binary(h) do
+    size = byte_size(h)
+
+    if size <= n do
+      seek(t, ks, n - size)
+    else
+      {[binary_part(h, n, size - n) | t], ks}
+    end
+  end
+
+  defp seek([h | t], ks, n) when is_integer(h), do: seek(t, ks, n - 1)
+  defp seek([h | t], ks, n) when is_list(h), do: seek(h, [t | ks], n)
+  defp seek(b, ks, n) when is_binary(b), do: seek([b], ks, n)
+
+  # Collect the next `n` bytes into a flat iolist (or a single binary when the
+  # range lies within one chunk).
+  defp gather(_rest, _ks, 0, acc), do: {:ok, finish(acc)}
+  defp gather([], [], _n, _acc), do: {:error, :insufficient_data}
+  defp gather([], [k | ks], n, acc), do: gather(k, ks, n, acc)
+
+  defp gather([h | t], ks, n, acc) when is_binary(h) do
+    size = byte_size(h)
+
+    if size <= n do
+      gather(t, ks, n - size, [h | acc])
+    else
+      {:ok, finish([binary_part(h, 0, n) | acc])}
+    end
+  end
+
+  defp gather([h | t], ks, n, acc) when is_integer(h), do: gather(t, ks, n - 1, [h | acc])
+  defp gather([h | t], ks, n, acc) when is_list(h), do: gather(h, [t | ks], n, acc)
+  defp gather(b, ks, n, acc) when is_binary(b), do: gather([b], ks, n, acc)
+
+  defp finish([bin]) when is_binary(bin), do: bin
+  defp finish(acc), do: :lists.reverse(acc)
+
+  # -- to_binary ---------------------------------------------------------------
 
   def to_binary(data), do: {:ok, :erlang.list_to_binary(data)}
 
@@ -170,76 +202,8 @@ defimpl IOData, for: List do
 
   def to_binary!(data, start, count) do
     case to_binary(data, start, count) do
-      {:ok, iolist} -> iolist
+      {:ok, binary} -> binary
       {:error, reason} -> raise ArgumentError, message: "#{reason}"
     end
   end
-
-  defp seek([], n), do: {[], n}
-  defp seek(iolist, 0), do: {iolist, 0}
-
-  defp seek(iolist, n) do
-    case next(iolist) do
-      :eol ->
-        {[], n}
-
-      {byte, rest} when is_integer(byte) ->
-        if n > 1 do
-          seek(rest, n - 1)
-        else
-          {rest, 0}
-        end
-
-      {chunk, rest} ->
-        chunk_size = byte_size(chunk)
-
-        if chunk_size > n do
-          {[binary_part(chunk, n, chunk_size - n) | rest], 0}
-        else
-          seek(rest, n - chunk_size)
-        end
-    end
-  end
-
-  defp gather([], n), do: {[], n}
-  defp gather(_, 0), do: {[], 0}
-
-  defp gather(iolist, n) do
-    case next(iolist) do
-      :eol ->
-        {[], n}
-
-      {byte, rest} when is_integer(byte) ->
-        if n == 1 do
-          {[byte], 0}
-        else
-          {nchunk, nn} = gather(rest, n - 1)
-          {[byte | nchunk], nn}
-        end
-
-      {chunk, rest} ->
-        chunk_size = byte_size(chunk)
-
-        if chunk_size > n do
-          {[binary_part(chunk, 0, n)], 0}
-        else
-          {nchunk, nn} = gather(rest, n - chunk_size)
-          {[chunk | nchunk], nn}
-        end
-    end
-  end
-
-  defp next([]), do: :eol
-  defp next([[] | tail]), do: next(tail)
-  defp next([<<>> | tail]), do: next(tail)
-  defp next([head | tail]) when is_integer(head) or is_binary(head), do: {head, tail}
-
-  defp next([head | tail]) when is_list(head) do
-    case next(head) do
-      :eol -> next(tail)
-      {chunk, rest} -> {chunk, [rest | tail]}
-    end
-  end
-
-  defp next(binary) when is_binary(binary), do: {binary, []}
 end

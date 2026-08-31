@@ -199,4 +199,53 @@ defmodule IODataSliceTest do
     slice = Slice.wrap("hello world", 6, 5)
     assert IOData.to_binary!(slice, 1, 3) == "orl"
   end
+
+  test "a slice with no count over a list reads to the end" do
+    slice = IOData.Slice.wrap(["ab", ["cd"]], 1)
+    assert IOData.size(slice) == 3
+    assert IOData.to_binary(slice) == {:ok, "bcd"}
+    assert IOData.to_binary!(slice) == "bcd"
+    assert {:ok, io} = IOData.to_iodata(slice)
+    assert IO.iodata_to_binary(io) == "bcd"
+    assert IOData.starts_with?(slice, "bc")
+    assert IOData.at_least?(slice, 3)
+    refute IOData.at_least?(slice, 4)
+  end
+
+  test "wrapping a list advances it to start eagerly" do
+    assert Slice.wrap(["hello", " ", "world"], 7, 3) ==
+             %Slice{iodata: ["orld"], start: 0, count: 3}
+
+    assert Slice.wrap(["hello", " ", "world"], 0, 3) ==
+             %Slice{iodata: ["hello", " ", "world"], start: 0, count: 3}
+
+    assert Slice.wrap(["ab", ["cd"]], 4) == %Slice{iodata: [], start: 0, count: nil}
+  end
+
+  test "wrapping a list past its end leaves the slice unnormalized and its ops erroring" do
+    slice = Slice.wrap(["ab"], 5, 1)
+    assert slice == %Slice{iodata: ["ab"], start: 5, count: 1}
+    assert IOData.to_binary(slice) == {:error, :insufficient_data}
+    assert {:ok, {a, b}} = IOData.split(slice, 1)
+    assert IOData.to_binary(a) == {:error, :insufficient_data}
+    assert IOData.to_binary(b) == {:error, :insufficient_data}
+  end
+
+  test "consuming a list through successive slices yields the right records" do
+    chunks = for i <- 1..64, do: <<i::8>>
+    data = Enum.reduce(chunks, [], &[&2, &1])
+    slice = Slice.wrap(data, 0, 64)
+
+    {records, rest} =
+      Enum.reduce(1..8, {[], slice}, fn _, {acc, rest} ->
+        {rec, rest} = IOData.split!(rest, 8)
+        {[IOData.to_binary!(rec) | acc], rest}
+      end)
+
+    assert Enum.reverse(records) ==
+             for(i <- 0..7, do: IO.iodata_to_binary(Enum.slice(chunks, i * 8, 8)))
+
+    assert IOData.size(rest) == 0
+    assert rest.start == 0
+  end
 end

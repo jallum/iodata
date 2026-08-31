@@ -32,6 +32,18 @@
   `ArgumentError`, and `at_least?/2` returns `false`.
 - Fixed `IOData.to_binary/1` (and friends) on the suffix of `IOData.split/2`
   of a file — a slice with no count — passing `nil` as the read length.
+- Fixed `IOData.to_binary/3` (and `to_iodata/3`) on files returning a short
+  read tagged `{:ok, _}` when the range extended past the end of the file;
+  it now returns `{:error, :insufficient_data}`, matching the other
+  implementations. Reads entirely past the end also now return
+  `{:error, :insufficient_data}` instead of `{:error, :eof}`.
+- Fixed file reads returning charlists for files opened without `:binary`;
+  reads are normalized to binaries (a no-op for binary-mode files), which
+  also fixes `IOData.starts_with?/2` on text-mode files.
+- `IOData.split/2` on a file now validates the offset against the file size
+  and returns `{:error, :insufficient_data}` (and `split!/2` raises) instead
+  of unconditionally succeeding. `slice/2,3` remains lazy; out-of-range
+  slices error when read.
 - Added a Benchee suite under `bench/` (see `bench/README.md`).
 
 ## 0.8.0 — 2026-08-28

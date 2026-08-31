@@ -186,9 +186,38 @@ defmodule IODataFileTest do
     assert IOData.to_binary(file, 0, 0) == {:ok, <<>>}
   end
 
-  test "to_binary/3 returns an eof error when reading past the end" do
+  test "to_binary/3 returns an error when reading past the end" do
     file = tmp_file("hello")
-    assert IOData.to_binary(file, 100, 5) == {:error, :eof}
+    assert IOData.to_binary(file, 100, 5) == {:error, :insufficient_data}
+  end
+
+  test "to_binary/3 returns an error instead of a short read when the range overlaps the end" do
+    file = tmp_file("hello")
+    assert IOData.to_binary(file, 3, 5) == {:error, :insufficient_data}
+    assert IOData.to_binary(file, 0, 6) == {:error, :insufficient_data}
+    assert IOData.to_binary(file, 3, 2) == {:ok, "lo"}
+  end
+
+  test "text-mode files still yield binaries" do
+    file_name = "file_file_test_text_#{:rand.uniform(100_000)}"
+    {:ok, file} = :file.open(file_name, [:write, :read])
+    :ok = File.rm(file_name)
+    :ok = :file.pwrite(file, 0, "hello")
+    on_exit(fn -> :file.close(file) end)
+
+    assert IOData.to_binary(file) == {:ok, "hello"}
+    assert IOData.to_binary(file, 1, 3) == {:ok, "ell"}
+    assert IOData.starts_with?(file, "he")
+  end
+
+  test "split/2 validates the offset against the file size" do
+    file = tmp_file("hello")
+    assert IOData.split(file, 6) == {:error, :insufficient_data}
+    assert_raise ArgumentError, fn -> IOData.split!(file, 6) end
+    assert {:ok, {prefix, suffix}} = IOData.split(file, 5)
+    assert IOData.to_binary(prefix) == {:ok, "hello"}
+    assert IOData.to_binary(suffix) == {:ok, <<>>}
+    assert {:error, _} = IOData.split(closed_file(), 1)
   end
 
   test "to_binary!/3 raises when reading past the end" do
@@ -259,7 +288,23 @@ defmodule IODataFileTest do
       assert IOData.to_binary!(file, 6, 5) == "world"
       assert IOData.to_iodata(file, 6, 5) == {:ok, "world"}
       assert IOData.to_iodata!(file, 6, 5) == "world"
-      assert IOData.to_binary(file, 100, 5) == {:error, :eof}
+      assert IOData.to_binary(file, 100, 5) == {:error, :insufficient_data}
+      assert IOData.to_binary(file, 9, 5) == {:error, :insufficient_data}
+    end
+
+    test "text-mode raw files still yield binaries" do
+      file_name = "file_file_test_rawtext_#{:rand.uniform(100_000)}"
+      {:ok, file} = :file.open(file_name, [:write, :read, :raw])
+      :ok = File.rm(file_name)
+      :ok = :file.pwrite(file, 0, "hello")
+      assert IOData.to_binary(file) == {:ok, "hello"}
+      assert IOData.starts_with?(file, "he")
+    end
+
+    test "split/2 validates the offset against the file size" do
+      file = raw_file("hello")
+      assert IOData.split(file, 6) == {:error, :insufficient_data}
+      assert_raise ArgumentError, fn -> IOData.split!(file, 6) end
     end
 
     test "other tuples raise Protocol.UndefinedError" do

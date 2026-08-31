@@ -11,8 +11,14 @@ defmodule IOData.File do
   Raw handles skip the file-server hop, so every read is roughly 5x cheaper,
   but they can only be used from the process that opened them.
 
-  Every operation here is at least one round trip to the file. `split/2` and
-  `slice/2,3` are lazy — they return `IOData.Slice`s and do no I/O.
+  Open files in `:binary` mode. Text-mode reads (charlists) are converted to
+  binaries on the way out, but binary mode avoids the intermediate list
+  entirely.
+
+  Every operation here is at least one round trip to the file. `split/2`
+  validates the offset against the file size (one `read_file_info`);
+  `slice/2,3` is lazy — it does no I/O, so an out-of-range slice is only
+  reported as `:insufficient_data` when it is read.
   """
 
   alias IOData.Slice
@@ -34,9 +40,22 @@ defmodule IOData.File do
   def slice(file, start, count), do: {:ok, Slice.wrap(file, start, count)}
   def slice!(file, start, count), do: Slice.wrap(file, start, count)
 
-  def split(file, at), do: {:ok, split!(file, at)}
+  def split(file, at) do
+    case :file.read_file_info(file) do
+      {:ok, info} when at <= elem(info, 1) -> {:ok, split_slices(file, at)}
+      {:ok, _info} -> {:error, :insufficient_data}
+      {:error, reason} -> {:error, reason}
+    end
+  end
 
-  def split!(file, at), do: {Slice.wrap(file, 0, at), Slice.wrap(file, at, nil)}
+  def split!(file, at) do
+    case split(file, at) do
+      {:ok, slices} -> slices
+      {:error, reason} -> raise ArgumentError, message: "#{reason}"
+    end
+  end
+
+  defp split_slices(file, at), do: {Slice.wrap(file, 0, at), Slice.wrap(file, at, nil)}
 
   def starts_with?(_file, <<>>), do: true
 
@@ -71,11 +90,23 @@ defmodule IOData.File do
   end
 
   def to_binary(file, start, count) do
-    # An integer offset works for both handle kinds; `{:bof, n}` is file-server only.
+    # An integer offset works for both handle kinds; `{:bof, n}` is file-server
+    # only. pread returns a short read when the range extends past EOF, and a
+    # charlist for a file opened without :binary. Normalize (the conversion is
+    # the identity for a binary) and enforce the protocol's exact-count
+    # contract.
     case :file.pread(file, start, count) do
-      {:ok, data} -> {:ok, data}
-      :eof -> {:error, :eof}
-      {:error, reason} -> {:error, reason}
+      {:ok, data} ->
+        case IO.iodata_to_binary(data) do
+          binary when byte_size(binary) == count -> {:ok, binary}
+          _short -> {:error, :insufficient_data}
+        end
+
+      :eof ->
+        {:error, :insufficient_data}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 

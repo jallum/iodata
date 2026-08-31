@@ -105,7 +105,7 @@ defimpl IOData, for: List do
       binary_part(h, 0, prefix_size) == prefix
     else
       case prefix do
-        <<^h::binary-size(size), rest::binary>> -> starts_with(t, ks, rest)
+        <<^h::binary-size(^size), rest::binary>> -> starts_with(t, ks, rest)
         _ -> false
       end
     end

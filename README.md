@@ -4,14 +4,14 @@
 
 # IOData
 
-A protocol for efficently working with data (like binaries and iolists) with 
+A protocol for efficiently working with data (like binaries and iolists) with 
 minimal copying. 
 
 Implementations are provided for
 
 - binaries
 - iolists
-- files & file descriptors
+- files (both regular and `:raw` handles)
 - slices of other iodata
 
 ## Usage
@@ -54,4 +54,17 @@ true
 
 iex> IOData.at_least?(["h", "ello", [[" "], "world"]], 4)
 true
+```
+
+Working with files without reading them up front — `slice!/3` does no I/O and
+`split!/2` only checks the file size; reads touch just the requested range.
+Open files in `:binary` mode; `:raw` handles skip the file-server process
+(roughly 3-5x cheaper per read) but can only be used from the process that
+opened them:
+
+```elixir
+iex> {:ok, file} = :file.open(path, [:read, :binary, :raw])
+iex> {header, rest} = IOData.split!(file, 64)
+iex> IOData.to_binary!(header)
+<<...64 bytes...>>
 ```
